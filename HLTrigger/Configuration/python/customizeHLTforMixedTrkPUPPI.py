@@ -4,6 +4,9 @@ from HLTrigger.Configuration.common import producers_by_type
 import os
 from CondCore.CondDB.CondDB_cfi import CondDB as _CondDB
 
+from CommonTools.PileupAlgos.Puppi_cff import puppi as _puppi, puppiNoLep as _puppiNoLep
+
+ONLINE_OFFLINE_PUPROXY_SF = 0.0027
 
 def usePFHCsAndJECs(process, DBFile):
     
@@ -54,10 +57,6 @@ def usePFHCsAndJECs(process, DBFile):
     return process
 
 # This is a customization function that adjusts the existsing modules of the menu to add mixed tracking in a minimal way
-# Minimal way means:
-# 1. It affects mininal number of modules JME, BTAG modules and the beamspot paths (from the change of the hltVerticePF).
-# 2. It is such the added CPU time on the menu remains low - so a realistic scenario of using this in all paths would be feasible. - current latest estimate ~10ms addition using all paths.
-# Note: A final implementation on actual data taking would be the addition of this so for timing need a duplication of modules in use and doing these modifications bellow on those.
 def customizeHLTForMixedPF(process):
 
     # change the JECs
@@ -72,7 +71,7 @@ def customizeHLTForMixedPF(process):
 
     # Apply cuts for pixel tracks complement
     ## Quadraplets only to reduce timing (not very big impact in performance)
-    process.hltPixelTracksLowPT = cms.EDProducer( "TrackWithVertexSelector",
+    process.hltPixelPUTracks = cms.EDProducer( "TrackWithVertexSelector",
         normalizedChi2 = cms.double( 999999.0 ),
         numberOfValidHits = cms.uint32( 0 ),
         zetaVtx = cms.double( 0.3 ),
@@ -85,8 +84,8 @@ def customizeHLTForMixedPF(process):
         copyTrajectories = cms.untracked.bool( False ),
         nSigmaDtVertex = cms.double( 0.0 ),
         timesTag = cms.InputTag( "" ),
-        ptMin = cms.double( 0.5 ), # minimum pT cut 
-        ptMax = cms.double( 5.0 ), # maximum pT cut
+        ptMin = cms.double( 0.5 ), # minimum pT cut (this is the one used for Pixel Vertexing - 0.5 GeV)
+        ptMax = cms.double( 10.0 ), # maximum pT cut 
         d0Max = cms.double( 999.0 ),
         copyExtras = cms.untracked.bool( False ),
         nVertices = cms.uint32( 2 ),
@@ -94,14 +93,14 @@ def customizeHLTForMixedPF(process):
         src = cms.InputTag( "hltIter0PFLowPixelSeedsFromPixelTracks" ), # the complement reco::TrackCollection
         vtxFallback = cms.bool( True ),
         numberOfLostHits = cms.uint32( 999 ),
-        numberOfValidPixelHits = cms.uint32( 4 ),
+        numberOfValidPixelHits = cms.uint32( 3 ), # for now keeping everything 
         timeResosTag = cms.InputTag( "" ),
         useVtx = cms.bool( False ) ## Turning off vertex selection
     )
     
-    # Note: this is before the doublet recovery iteration is introduced.
-    process.HLTIterativeTrackingIteration0 = cms.Sequence(process.hltIter0PFLowPixelSeedsFromPixelTracks+process.hltPixelTracksLowPT+process.hltIter0PFlowCkfTrackCandidates+process.hltIter0PFlowCtfWithMaterialTracks+process.hltIter0PFlowTrackCutClassifier+process.hltIter0PFlowTrackSelectionHighPurity)
-
+    # Doing it only for triplets i.e. classic Patatrack tracks - for doublets for Doublet Recover(BPix/FPix) there is no need to do it.
+    #process.HLTIterativeTrackingIteration0 = cms.Sequence(process.hltIter0PFLowPixelSeedsFromPixelTracks+process.hltPixelPUTracks+process.hltIter0PFlowCkfTrackCandidates+process.hltIter0PFlowCtfWithMaterialTracks+process.hltIter0PFlowTrackCutClassifier+process.hltIter0PFlowTrackSelectionHighPurity)
+    process.HLTIterativeTrackingIteration0.insert(process.HLTIterativeTrackingIteration0.index(process.hltIter0PFLowPixelSeedsFromPixelTracks)+1, process.hltPixelPUTracks)
 
     # Merging Iter0 tracks with the complement of pixel tracks
     process.hltPFTracks = cms.EDProducer( "TrackListMerger",
@@ -112,10 +111,10 @@ def customizeHLTForMixedPF(process):
         Epsilon = cms.double( -0.001 ),
         MaxNormalizedChisq = cms.double( 1000.0 ),
         MinFound = cms.int32( 3 ),
-        TrackProducers = cms.VInputTag( 'hltPixelTracksLowPT','hltPFMuonMerging' ),
+        TrackProducers = cms.VInputTag( 'hltPixelPUTracks','hltPFMuonMerging' ),
         hasSelector = cms.vint32( 0, 0),
         indivShareFrac = cms.vdouble( 1.0, 1.0),
-        selectedTrackQuals = cms.VInputTag( 'hltPixelTracksLowPT','hltPFMuonMerging' ),
+        selectedTrackQuals = cms.VInputTag( 'hltPixelPUTracks','hltPFMuonMerging' ),
         setsToMerge = cms.VPSet(
           cms.PSet(  pQual = cms.bool( False ),
             tLists = cms.vint32( 0, 1)
@@ -129,7 +128,8 @@ def customizeHLTForMixedPF(process):
         copyMVA = cms.bool( False )
     )
     
-    process.HLTTrackReconstructionForPF = cms.Sequence(process.HLTDoLocalPixelSequence+process.HLTRecopixelvertexingSequence+process.HLTDoLocalStripSequence+process.HLTIterativeTrackingIter02+process.hltPFMuonMerging+process.hltPFTracks+process.hltMuonLinks+process.hltMuons)
+    #process.HLTTrackReconstructionForPF = cms.Sequence(process.HLTDoLocalPixelSequence+process.HLTRecopixelvertexingSequence+process.HLTDoLocalStripSequence+process.HLTIterativeTrackingIter02+process.hltPFMuonMerging+process.hltPFTracks+process.hltMuonLinks+process.hltMuons)
+    process.HLTTrackReconstructionForPF.insert(process.HLTTrackReconstructionForPF.index(process.hltPFMuonMerging)+1, process.hltPFTracks)
     
     # simple test to effectively remove the effect of doublet recovery iteration
     # process.hltPFMuonMerging.TrackProducers = cms.VInputTag("hltIterL3MuonTracks", "hltIter0PFlowTrackSelectionHighPurity")
@@ -154,8 +154,9 @@ def customizeHLTForMixedPF(process):
     process.hltVerticesPF.TkFilterParameters.minValidStripHits = cms.int32(1)
 
     # Add the PFTracks in HLTTrackingForBeamspot
-    process.HLTTrackingForBeamSpot = cms.Sequence(process.HLTPreAK4PFJetsRecoSequence+process.HLTL2muonrecoSequence+process.HLTL3muonrecoSequence+process.HLTDoLocalPixelSequence+process.HLTRecopixelvertexingSequence+process.HLTDoLocalStripSequence+process.HLTIterativeTrackingIter02+process.hltPFMuonMerging+process.hltPFTracks)
-    
+    #process.HLTTrackingForBeamSpot = cms.Sequence(process.HLTPreAK4PFJetsRecoSequence+process.HLTL2muonrecoSequence+process.HLTL3muonrecoSequence+process.HLTDoLocalPixelSequence+process.HLTRecopixelvertexingSequence+process.HLTDoLocalStripSequence+process.HLTIterativeTrackingIter02+process.hltPFMuonMerging+process.hltPFTracks)
+    process.HLTTrackingForBeamSpot += process.hltPFTracks
+
     return process
 
 
@@ -176,90 +177,49 @@ def convertPFJetsToPUPPI(process):
     )
     
     ## Modifications for Jets
-    process.hltPFPuppi = cms.EDProducer("PuppiProducer",
-        DeltaZCut = cms.double(0.3),
-        DeltaZCutForChargedFromPUVtxs = cms.double(0.2),
-        EtaMaxCharged = cms.double(99999),
-        EtaMaxPhotons = cms.double(2.5),
-        EtaMinUseDeltaZ = cms.double(0.0),
-        MinPuppiWeight = cms.double(0.01),
-        NumOfPUVtxsForCharged = cms.uint32(2),
-        PUProxyValue = cms.InputTag("hltPixelClustersMultiplicity"),
-        PtMaxCharged = cms.double(20.0),
-        PtMaxNeutrals = cms.double(200),
-        PtMaxNeutralsStartSlope = cms.double(20.0),
-        PtMaxPhotons = cms.double(20.0),
-        UseDeltaZCut = cms.bool(True),
-        UseDeltaZCutForPileup = cms.bool(True),
-        UseFromPVLooseTight = cms.bool(False),
-        algos = cms.VPSet(
-            cms.PSet(
-                EtaMaxExtrap = cms.double(2.0),
-                MedEtaSF = cms.vdouble(1.0, 1.0),
-                MinNeutralPt = cms.vdouble(0.2, 0.2),
-                MinNeutralPtSlope = cms.vdouble(4.86e-05, 8.1e-05),
-                RMSEtaSF = cms.vdouble(1.0, 1.0),
-                etaMax = cms.vdouble(1.3, 2.5),
-                etaMin = cms.vdouble(0.0, 1.3),
-                ptMin = cms.vdouble(0.0, 0.0),
-                puppiAlgos = cms.VPSet(cms.PSet(
-                    algoId = cms.int32(5),
-                    applyLowPUCorr = cms.bool(True),
-                    combOpt = cms.int32(0),
-                    cone = cms.double(0.4),
-                    rmsPtMin = cms.double(0.1),
-                    rmsScaleFactor = cms.double(1.0),
-                    useCharged = cms.bool(True)
-                ))
-            ),
-            cms.PSet(
-                EtaMaxExtrap = cms.double(2.0),
-                #MedEtaSF = cms.vdouble(1.1, 1.05),
-                MedEtaSF = cms.vdouble(0.9, 0.75),
-                MinNeutralPt = cms.vdouble(1.7, 2.0),
-                MinNeutralPtSlope = cms.vdouble(0.000216, 0.000216),#cms.vdouble(0.0008640000000000001, 0.0002025),
-                #RMSEtaSF = cms.vdouble(1.3, 0.4),
-                RMSEtaSF = cms.vdouble(1.2, 0.95),
-                etaMax = cms.vdouble(3.0, 10.0),
-                etaMin = cms.vdouble(2.5, 3.0),
-                ptMin = cms.vdouble(0.0, 0.0),
-                puppiAlgos = cms.VPSet(cms.PSet(
-                    algoId = cms.int32(5),
-                    applyLowPUCorr = cms.bool(True),
-                    combOpt = cms.int32(0),
-                    cone = cms.double(0.4),
-                    rmsPtMin = cms.double(0.5),
-                    rmsScaleFactor = cms.double(1.0),
-                    useCharged = cms.bool(False)
-                ))
-            )
-        ),
-        applyCHS = cms.bool(True),
-        candName = cms.InputTag("hltParticleFlow"),
-        clonePackedCands = cms.bool(False),
-        invertPuppi = cms.bool(False),
-        mightGet = cms.optional.untracked.vstring,
-        puppiDiagnostics = cms.bool(False),
-        puppiNoLep = cms.bool(False),
-        useExistingWeights = cms.bool(False),
-        useExp = cms.bool(False),
-        usePUProxyValue = cms.bool(True),
-        useVertexAssociation = cms.bool(False),
-        vertexAssociation = cms.InputTag(""),
-        vertexAssociationQuality = cms.int32(0),
-        vertexName = cms.InputTag("hltPixelVertices"), # Could use hltVerticesPF to use vertex fit information - but it seems problematic now.
-        vtxNdofCut = cms.int32(4),
-        vtxZCut = cms.double(24)
+    process.hltPFPuppi = _puppi.clone(
+      candName = 'hltParticleFlow',
+      UseDeltaZCut = True,
+      EtaMinUseDeltaZ = 0.0,
+      DeltaZCut = 0.3,
+      #UseFromPVLooseTight = True,
+      vtxNdofCut = 4,
+      vtxZCut=24,
+      UseDeltaZCutForPileup = True,
+      vertexName = 'hltVerticesPF',
+      #vertexName = 'hltPixelVertices',
+      usePUProxyValue = True,
+      PUProxyValue = 'hltPixelClustersMultiplicity',
+      #NumOfPUVtxsForCharged = 0,
+      useVertexAssociation = False,
+      #NumOfPUVtxsForCharged = 2,  # from any vertex apply dz cut 
+      #DeltaZCutForChargedFromPUVtxs = 1000.0
+      #PtMaxNeutralsStartSlope = 10.0,
+      #PtMaxNeutrals = 190.0,
     )
-    
+                    
     # note: here adding also MET/METNoMu PUPPI producers
-    # normally for timing purposes of course would like to keep this separate - it is a waste of resources! 
-    process.hltPFPuppiNoLep = process.hltPFPuppi.clone()
-    process.hltPFPuppiNoLep.puppiNoLep = cms.bool(True)
+    process.hltPFPuppiNoLep = process.hltPFPuppi.clone(
+        puppiNoLep = cms.bool(True)
+    )
 
-    process.hltPFPuppiNoLepNoMu = process.hltPFPuppiNoLep.clone()
-    process.hltPFPuppiNoLepNoMu.candName = cms.InputTag("hltParticleFlowNoMu")
-    
+    process.hltPFPuppiNoLepNoMu = process.hltPFPuppiNoLep.clone(
+        candName = cms.InputTag("hltParticleFlowNoMu")
+    )
+
+    ## Modify the PUPPI A,B parameters
+    for mod_i in [process.hltPFPuppi, process.hltPFPuppiNoLep, process.hltPFPuppiNoLepNoMu]:
+      for algo_idx in range(len(mod_i.algos)):
+        if len(mod_i.algos[algo_idx].MinNeutralPt) != len(mod_i.algos[algo_idx].MinNeutralPtSlope):
+          raise RuntimeError('instance of PuppiProducer is misconfigured:\n\n'+str(mod_i)+' = '+mod_i.dumpPython())
+
+        for algoReg_idx in range(len(mod_i.algos[algo_idx].MinNeutralPt)):
+          mod_i.algos[algo_idx].MinNeutralPtSlope[algoReg_idx] *= ONLINE_OFFLINE_PUPROXY_SF
+
+    ## convert AK4 jets to PUPPI ones by adding the PUPPI weights
+    process.hltAK4PFJets.srcWeights = cms.InputTag("hltPFPuppi")
+    process.hltAK4PFJets.applyWeight = cms.bool(True)
+
     # modify the PF sequence to add calculation of the PUPPI weights    
     process.HLTAK4PFJetsReconstructionSequence = cms.Sequence(
         process.HLTL2muonrecoSequence
@@ -276,9 +236,6 @@ def convertPFJetsToPUPPI(process):
       + process.hltAK4PFJetsLooseID
       + process.hltAK4PFJetsTightID
     )
-    ## convert AK4 jets to PUPPI ones by adding the PUPPI weights
-    process.hltAK4PFJets.srcWeights = cms.InputTag("hltPFPuppi")
-    process.hltAK4PFJets.applyWeight = cms.bool(True)
 
     # change the JECs for corrected Jets tags
     process.hltAK4PFFastJetCorrector.algorithm = cms.string('AK4PFPuppiHLT')
@@ -305,42 +262,6 @@ def convertPFJetsToPUPPI(process):
     process.hltPFMETNoMuProducer.srcWeights = cms.InputTag("hltPFPuppiNoLepNoMu")
     process.hltPFMETNoMuProducer.applyWeight = cms.bool(True)
 
-    process.HLTJetFlavourTagParticleNetSequencePFAK8 = cms.Sequence(
-        process.hltVerticesPF
-      + process.hltVerticesPFSelector
-      + process.hltVerticesPFFilter
-      + process.hltPixelClustersMultiplicity ##
-      + process.hltPFPuppi ##
-      + process.hltAK4PFJets
-      + process.hltAK4PFJetsLooseID
-      + process.hltAK4PFJetsTightID
-      + process.HLTAK4PFJetsCorrectionSequence
-      + process.hltPFJetForBtagSelector
-      + process.hltPFJetForBtag
-      + process.hltPFJetForPNetSelectorAK8
-      + process.hltPFJetForPNetAK8
-      + process.hltDeepBLifetimeTagInfosPF
-      + process.hltDeepInclusiveVertexFinderPF
-      + process.hltDeepInclusiveSecondaryVerticesPF
-      + process.hltDeepTrackVertexArbitratorPF
-      + process.hltDeepInclusiveMergedVerticesPF
-      + process.hltPrimaryVertexAssociation
-      + process.hltParticleNetJetTagsInfosAK8
-      + process.hltParticleNetONNXJetTagsAK8
-      + process.hltParticleNetDiscriminatorsJetTagsAK8
-    )
-
-    process.HLTAK4PFJetsReconstructionVBFSequence = cms.Sequence(
-        process.HLTL2muonrecoSequence
-      + process.HLTL3muonrecoSequence
-      + process.HLTTrackReconstructionForPF
-      + process.HLTParticleFlowSequence
-      + process.hltPixelClustersMultiplicity ##
-      + process.hltPFPuppi ##
-      + process.hltAK4PFJets
-      + process.hltAK4PFJetsLooseIDVBF
-      + process.hltAK4PFJetsTightIDVBF
-    )
     
     return process
 
