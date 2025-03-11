@@ -236,13 +236,31 @@ def convertPFJetsToPUPPI(process):
       + process.hltAK4PFJetsLooseID
       + process.hltAK4PFJetsTightID
     )
+    
+    process.HLTAK8PFJetsReconstructionSequence = cms.Sequence(
+        process.HLTL2muonrecoSequence
+       +process.HLTL3muonrecoSequence
+       +process.HLTTrackReconstructionForPF
+       +process.HLTParticleFlowSequence
+       + process.hltVerticesPF
+       + process.hltPixelClustersMultiplicity ##
+       + process.hltPFPuppi ##
+       + process.hltPFPuppiNoLep ##
+       + process.hltParticleFlowNoMu ## 
+       + process.hltPFPuppiNoLepNoMu ##
+       +process.hltAK8PFJets
+     )
 
     # change the JECs for corrected Jets tags
-    process.hltAK4PFFastJetCorrector.algorithm = cms.string('AK4PFPuppiHLT')
-    process.hltAK4PFRelativeCorrector.algorithm = cms.string('AK4PFPuppiHLT')
-    process.hltAK4PFAbsoluteCorrector.algorithm = cms.string('AK4PFPuppiHLT')
-    process.hltAK4PFResidualCorrector.algorithm = cms.string('AK4PFPuppiHLT')
+    # process.hltAK4PFFastJetCorrector.algorithm = cms.string('AK4PFPuppiHLT')
+    # process.hltAK4PFRelativeCorrector.algorithm = cms.string('AK4PFPuppiHLT')
+    # process.hltAK4PFAbsoluteCorrector.algorithm = cms.string('AK4PFPuppiHLT')
+    # process.hltAK4PFResidualCorrector.algorithm = cms.string('AK4PFPuppiHLT')
     
+    # process.hltAK4PFFastJetCorrector.algorithm = cms.string('AK8PFPuppiHLT')
+    # process.hltAK8PFRelativeCorrector.algorithm = cms.string('AK8PFPuppiHLT')
+    # process.hltAK8PFAbsoluteCorrector.algorithm = cms.string('AK8PFPuppiHLT')
+    # process.hltAK8PFResidualCorrector.algorithm = cms.string('AK8PFPuppiHLT')
 
     # add changes here for AK8
     ## convert AK8 jets to PUPPI ones by adding the PUPPI weights
@@ -265,7 +283,8 @@ def convertPFJetsToPUPPI(process):
     
     return process
 
-# This function converts all PF jets to PF+CHS jets.
+# This function converts all PF jets to PF
+# +CHS jets.
 # i.e. all paths in the menu will use CHS.
 def convertPFJetsToCHS(process):
     # change tracking to Mixed tracking
