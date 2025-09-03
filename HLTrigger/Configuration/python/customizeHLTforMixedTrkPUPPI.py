@@ -797,7 +797,7 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths):
        
     # append new paths to schedule
     if process.schedule_():
-      #process.schedule_().append(process.MC_JMEPFPuppi_v1)
+      process.schedule_().append(process.MC_JMEPFPuppi_v1) #can add that too or should i leave it out?
       process.schedule_().append(process.HLT_PFPuppiJet40_v1)
 
     return [process,listOfPaths]
@@ -1325,20 +1325,22 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths=[]):
     ] 
     
     # Adds the paths in the menu
-    # for pathName in newPathNames:
-    #    process.datasets.JetMET += cms.vstring(pathName)
-    #    process.datasets.OnlineMonitor += cms.vstring(pathName)
-    #    process.hltDatasetJetMET.triggerConditions += cms.vstring(pathName)
-    #    process.hltDatasetOnlineMonitor.triggerConditions += cms.vstring(pathName + ' / 3')
-    #    listOfPaths.append(pathName)
+    for pathName in newPathNames:
+        process.datasets.JetMET += cms.vstring(pathName)
+        process.datasets.OnlineMonitor += cms.vstring(pathName)
+        process.hltDatasetJetMET.triggerConditions += cms.vstring(pathName)
+        process.hltDatasetOnlineMonitor.triggerConditions += cms.vstring(pathName + ' / 3')
+        listOfPaths.append(pathName)
        
     # append new paths to schedule
-    process.schedule.insert(0,process.MC_JMEPFPuppi_v1)
+    #process.schedule.insert(0,process.MC_JMEPFPuppi_v1)
+    process.schedule.insert(0,process.HLT_PFPuppiJet40_v1)
+ 
     #process.schedule.append(process.MC_JMEPFPuppi_v1)
     #print(process.schedule)
-    # if process.schedule:
-    #    print('adding PUPPI paths to schedule')
-    #    #print(process.schedule)
+    if process.schedule:
+        print('adding PUPPI paths to schedule')
+        print(process.schedule) #prin to check if path is added.
     #    #process.schedule.revert()
     #    #print(process.schedule)
        
