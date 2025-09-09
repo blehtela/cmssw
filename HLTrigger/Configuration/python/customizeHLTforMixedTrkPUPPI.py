@@ -789,11 +789,13 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths):
     
     # Adds the paths in the menu
     for pathName in newPathNames:
-       process.datasets.JetMET += cms.vstring(pathName)
-       process.datasets.OnlineMonitor += cms.vstring(pathName)
-       process.hltDatasetJetMET.triggerConditions += cms.vstring(pathName)
-       process.hltDatasetOnlineMonitor.triggerConditions += cms.vstring(pathName + ' / 3')
-       listOfPaths.append(pathName)
+        if(hasattr(process,'datasets')): #only for data?
+            process.datasets.JetMET0 += cms.vstring(pathName) #only add if JetMET exists (i.e. only for data, not for MC) #exists always?
+            process.datasets.JetMET1 += cms.vstring(pathName) #only add if JetMET exists (i.e. only for data, not for MC) #exists always?
+            process.datasets.OnlineMonitor += cms.vstring(pathName)
+        process.hltDatasetJetMET.triggerConditions += cms.vstring(pathName)
+        process.hltDatasetOnlineMonitor.triggerConditions += cms.vstring(pathName + ' / 3')
+        listOfPaths.append(pathName)
        
     # append new paths to schedule
     if process.schedule_():
@@ -990,6 +992,7 @@ def addPaths_MC_JMEPFCHS(process):
 
     return process
 
+'''
 def addPaths_MC_JMEPFPuppi(process,listOfPaths=[]):
 
     process.hltPreMCJMEPFPuppi = cms.EDFilter('HLTPrescaler',
@@ -1326,12 +1329,14 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths=[]):
     
     # Adds the paths in the menu
     for pathName in newPathNames:
-        process.datasets.JetMET += cms.vstring(pathName)
-        process.datasets.OnlineMonitor += cms.vstring(pathName)
+        if(process.hasattr(datasets)): #only for data
+            process.datasets.JetMET += cms.vstring(pathName)
+            process.datasets.OnlineMonitor += cms.vstring(pathName)
         process.hltDatasetJetMET.triggerConditions += cms.vstring(pathName)
         process.hltDatasetOnlineMonitor.triggerConditions += cms.vstring(pathName + ' / 3')
         listOfPaths.append(pathName)
-       
+
+
     # append new paths to schedule
     #process.schedule.insert(0,process.MC_JMEPFPuppi_v1)
     process.schedule.insert(0,process.HLT_PFPuppiJet40_v1)
@@ -1350,3 +1355,4 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths=[]):
     # #   process.schedule_().append(process.HLT_PFPuppiJet40_v1)
 
     return [process,listOfPaths]
+'''
