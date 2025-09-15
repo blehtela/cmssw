@@ -766,7 +766,6 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths):
         triggerType = cms.int32(85)
     )
 
-
     process.HLT_PFPuppiJet40_v1 = cms.Path(
         process.SimL1Emulator
       + process.HLTBeginSequence 
@@ -781,10 +780,57 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths):
       + process.HLTEndSequence
     )
     
+    ## HLT_AK8PFPuppiJet40_v1 (started trying this on 09.09.2025)
+
+    #does this really need to change for AK8? how? Is the same as for AK4...
+    process.hltPrePFPuppiJet40AK8 = cms.EDFilter("HLTPrescaler", #put AK8 in end of name (to be consistent, filter: AK8 at str end)
+        L1GtReadoutRecordTag = cms.InputTag("hltGtStage2Digis"),
+        offset = cms.uint32(0)
+    )
+
+    process.hltPFPuppiJetsCorrectedMatchedToCaloJets10AK8 = cms.EDProducer("HLTPFJetsMatchedToFilteredCaloJetsProducer",
+        maxDeltaR = cms.double(0.5),
+        src = cms.InputTag("hltAK8PFPuppiJetsCorrected"), #changed AK4 -> AK8
+        triggerJetsFilter = cms.InputTag("hltSingleCaloJet10AK8"), #changed, appended AK8 to string
+        triggerJetsType = cms.int32(85)
+    )
+
+    process.hltSinglePFPuppiJet40AK8 = cms.EDFilter("HLT1PFJet", #is the first argument just a name?
+        MaxEta = cms.double(5.0),
+        MaxMass = cms.double(-1.0),
+        MinE = cms.double(-1.0),
+        MinEta = cms.double(-1.0),
+        MinMass = cms.double(-1.0),
+        MinN = cms.int32(1),
+        MinPt = cms.double(40.0),
+        inputTag = cms.InputTag("hltPFPuppiJetsCorrectedMatchedToCaloJets10AK8"),
+        saveTags = cms.bool(True),
+        triggerType = cms.int32(85)
+    )
+
+    #originally taken from AK4 puppi version, modified for AK8
+    process.HLT_AK8PFPuppiJet40_v1 = cms.Path(
+        process.SimL1Emulator
+      + process.HLTBeginSequence 
+      + process.hltL1sZeroBias                # L1 seed
+      + process.hltPrePFPuppiJet40AK8         #updated          # prescale filter
+      #+ process.hltPrePFPuppiJet40            #SAME AS AK4 - is this ok? # prescale filter
+      + process.HLTAK8CaloJetsSequence        #updated to AK8   # produce calo jets
+      + process.hltSingleCaloJet10AK8         #updated to AK8   # filter calos > 10 GeV (for matching - see later)  
+      + process.HLTPFPuppiSequence            #PUPPI: same as for AK4  # produce pf particles and puppi weights
+      + process.HLTAK8PFPuppiJetsSequence     #updated          # make AK4 jets reconstruction using puppi weights + calibrations
+      + process.hltPFPuppiJetsCorrectedMatchedToCaloJets10AK8   #updated # match puppi to calo jets with dR<0.5 
+      + process.hltSinglePFPuppiJet40AK8      #updated          # filter puppi jets with pT>40GeV
+      + process.HLTEndSequence
+    )
+
+
     ## adding paths in "trigger menu"
     # modify this list of names with any new path
     newPathNames = [
-       'HLT_PFPuppiJet40_v1'
+       'MC_JMEPFPuppi_v1',        #added MC (reconstruction) path (10.09.2025)
+       'HLT_PFPuppiJet40_v1',
+       'HLT_AK8PFPuppiJet40_v1'   #new (09.09.2025)
     ] 
     
     # Adds the paths in the menu
@@ -801,6 +847,7 @@ def addPaths_MC_JMEPFPuppi(process,listOfPaths):
     if process.schedule_():
       process.schedule_().append(process.MC_JMEPFPuppi_v1) #can add that too or should i leave it out?
       process.schedule_().append(process.HLT_PFPuppiJet40_v1)
+      process.schedule_().append(process.HLT_AK8PFPuppiJet40_v1)
 
     return [process,listOfPaths]
 
